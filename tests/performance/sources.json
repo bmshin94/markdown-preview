@@ -1,0 +1,21 @@
+[
+  "md-preview/Features/Editor/EditorHTML.swift",
+  "md-preview/Rendering/CodeFenceInfo.swift",
+  "md-preview/Rendering/CodeHighlighter.swift",
+  "md-preview/Rendering/DocumentFontSetting.swift",
+  "md-preview/Rendering/EscapingHTMLFormatter.swift",
+  "md-preview/Rendering/MarkdownAssetResolution.swift",
+  "md-preview/Rendering/MarkdownFrontmatter.swift",
+  "md-preview/Rendering/MarkdownHTML.swift",
+  "md-preview/Rendering/MarkdownHTML+Footnotes.swift",
+  "md-preview/Rendering/MarkdownHTML+Highlight.swift",
+  "md-preview/Rendering/MarkdownHTML+HostBridge.swift",
+  "md-preview/Rendering/MarkdownHTML+KaTeX.swift",
+  "md-preview/Rendering/MarkdownHTML+Math.swift",
+  "md-preview/Rendering/MarkdownHTML+Mermaid.swift",
+  "md-preview/Rendering/MarkdownHTML+RTL.swift",
+  "md-preview/Rendering/MarkdownHTML+Stylesheet.swift",
+  "md-preview/Rendering/MarkdownHTML+Utils.swift",
+  "md-preview/Rendering/QuickLookAppearance.swift",
+  "md-preview/Rendering/ReaderLayoutSetting.swift"
+]

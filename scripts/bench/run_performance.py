@@ -49,6 +49,54 @@ def legacy_editor(snapshot: Path) -> str:
     return template[:current_start] + body + template[current_end:]
 
 
+def source_paths(snapshot: Path) -> list[Path]:
+    manifest = snapshot / "tests/performance/sources.json"
+    if not manifest.exists():
+        # Bootstrap revisions from before the benchmark had its own manifest.
+        manifest = ROOT / "tests/performance/sources.json"
+    entries = json.loads(manifest.read_text())
+    if not isinstance(entries, list) or not entries or any(not isinstance(entry, str) for entry in entries):
+        raise ValueError(f"Invalid benchmark source manifest: {manifest}")
+    paths = [Path(entry) for entry in entries]
+    if (any(not path.parts or path.is_absolute() or ".." in path.parts or path.parts[0] != "md-preview"
+            or path.suffix != ".swift" for path in paths)
+            or len({path.name for path in paths}) != len(paths)):
+        raise ValueError(f"Invalid or duplicate benchmark source paths: {manifest}")
+    return paths
+
+
+def prepare_sources(snapshot: Path, sources: Path) -> None:
+    sources.mkdir(parents=True)
+    for relative in source_paths(snapshot):
+        production = snapshot / relative
+        destination = sources / relative.name
+        if production.is_file():
+            if relative.name == "MarkdownHTML+Utils.swift":
+                # Older checkouts need only the test bundle lookup. Production
+                # rendering code and assets otherwise come from that revision.
+                text = production.read_text()
+                if "moduleSubdir" not in text:
+                    lookup = '\n'.join([
+                        '        let moduleSubdir = subdir.hasPrefix("Vendor/") ? String(subdir.dropFirst(7)) : subdir',
+                        '        if let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: moduleSubdir) { return url }',
+                        '',
+                    ])
+                    text, count = re.subn(r"(?m)^        (?:var|let) bundles =", lambda match: lookup + match[0], text, count=1)
+                    if count != 1:
+                        raise ValueError("Vendor resource lookup changed")
+                destination.write_text(text)
+            else:
+                destination.symlink_to(production)
+        elif relative == Path("md-preview/Features/Editor/EditorHTML.swift"):
+            destination.write_text(legacy_editor(snapshot))
+        else:
+            raise ValueError(f"Production source missing: {production}")
+    # Share only this explicit URL-builder stub with the helper tests. Their
+    # other sources can be added, moved, or removed independently of benchmarks.
+    shutil.copy2(ROOT / "tests/swift-tests/Sources/MarkdownHelpers/MarkdownAssetSchemeStub.swift",
+                 sources / "MarkdownAssetSchemeStub.swift")
+
+
 def prepare(label: str, commit: str, out: Path) -> tuple[Path, Path]:
     snapshot = out / "work" / label / "repo"
     package = out / "work" / label / "probe"
@@ -58,35 +106,7 @@ def prepare(label: str, commit: str, out: Path) -> tuple[Path, Path]:
     run(["tar", "-xf", str(archive), "-C", str(snapshot)])
     archive.unlink()
     sources = package / "Sources"
-    sources.mkdir(parents=True)
-    for source in (ROOT / "tests/swift-tests/Sources/MarkdownHelpers").glob("*.swift"):
-        destination = sources / source.name
-        if source.is_symlink():
-            relative = source.resolve().relative_to(ROOT)
-            production = snapshot / relative
-            if production.exists():
-                # Older checkouts need only the test bundle lookup. Production
-                # rendering code and assets otherwise come from that revision.
-                text = production.read_text()
-                if source.name == "MarkdownHTML+Utils.swift":
-                    if "moduleSubdir" not in text:
-                        lookup = '\n'.join([
-                            '        let moduleSubdir = subdir.hasPrefix("Vendor/") ? String(subdir.dropFirst(7)) : subdir',
-                            '        if let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: moduleSubdir) { return url }',
-                            '',
-                        ])
-                        text, count = re.subn(r"(?m)^        (?:var|let) bundles =", lambda match: lookup + match[0], text, count=1)
-                        if count != 1:
-                            raise ValueError("Vendor resource lookup changed")
-                    destination.write_text(text)
-                else:
-                    destination.symlink_to(production)
-            elif source.name == "EditorHTML.swift":
-                destination.write_text(legacy_editor(snapshot))
-            else:
-                raise ValueError(f"Production source missing: {production}")
-        else:
-            shutil.copy2(source, destination)
+    prepare_sources(snapshot, sources)
     (sources / "Vendor").symlink_to(snapshot / "md-preview/Vendor", target_is_directory=True)
     shutil.copy2(ROOT / "tests/performance/Benchmark.swift", sources / "Benchmark.swift")
     # The app currently ignores Package.resolved. Keep explicit parser pins in

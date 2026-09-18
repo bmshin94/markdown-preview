@@ -56,6 +56,15 @@ one-time legacy editor adapter extracts the original page from
 `EditorViewController`; it preserves that revision's HTML, CSS, and JavaScript.
 Resource lookup is adapted only to locate the benchmark's SwiftPM assets.
 
+`sources.json` declares the production Swift files used by the benchmark.
+Each revision uses its own manifest; revisions predating the manifest use the
+controller's manifest. Add or update paths here when rendering dependencies
+change. All declared files must exist in that revision (apart from the legacy
+editor extraction above). The probe explicitly shares the asset URL-builder
+stub with the unit tests; it does not enumerate their helper target. Adding an
+unrelated helper or PR-only production file therefore cannot break preparation
+of the older baseline.
+
 ## When the check fails
 
 A metric must regress in **both independent rounds**, and the median increase
